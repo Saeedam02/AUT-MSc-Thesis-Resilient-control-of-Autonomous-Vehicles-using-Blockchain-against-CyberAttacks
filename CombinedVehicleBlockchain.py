@@ -7,7 +7,7 @@ import requests
 
 class Blockchain:
     def __init__(self):
-        self.current_transactions = []
+        self.current_transactions = {}
         self.chain = []
         self.nodes = set()
 
@@ -97,11 +97,11 @@ class Blockchain:
         }
 
         # Reset the current list of transactions
-        self.current_transactions = []
+        self.current_transactions = {}
         self.chain.append(block)
         return block
 
-    def new_transaction(self, sender, recipient, amount):
+    def new_transaction(self, vehicle_id, status):
         """
         Creates a new transaction to go into the next mined Block
 
@@ -110,10 +110,8 @@ class Blockchain:
         :param amount: Amount
         :return: The index of the Block that will hold this transaction
         """
-        self.current_transactions.append({
-            'sender': sender,
-            'recipient': recipient,
-            'amount': amount,
+        self.current_transactions.update({
+            'vehicle_id': status,
         })
 
         return self.last_block['index'] + 1
@@ -222,7 +220,7 @@ class Vehicle:
     def broadcast_state(self):
         # Create a transaction that represents the vehicle's state
         state = self.get_state()
-        self.blockchain.new_transaction(sender=self.id, recipient='all', amount=state)
+        self.blockchain.new_transaction(vehicle_id=self.id, status=self.get_state())
 
     def get_state(self):
         return {
@@ -246,9 +244,38 @@ if __name__ == "__main__":
     for step in range(10):
         for vehicle in vehicles:
             vehicle.update_dynamics()
+            print(f'Vehicle {vehicle.id} at ({vehicle.x}, {vehicle.y}')
+            status = vehicle.get_state()
+            vehicle.blockchain.new_transaction(vehicle.id ,status)
+
+
+        proof = blockchain.proof_of_work(blockchain.last_block)
+        vehicle.blockchain.new_block(proof,blockchain.hash(blockchain.last_block))
         # You can print the blockchain state periodically to observe the transactions
         if step % 10 == 0:
             print(f"Blockchain at step {step}:")
             print(json.dumps(blockchain.chain, indent=4))
 
    
+def full_chain():
+    response = {
+        'chain': blockchain.chain,
+        'length': len(blockchain.chain),
+    }
+    return response
+
+def consensus():
+    replaced = blockchain.resolve_conflicts()
+
+    if replaced:
+        response = {
+            'message': 'Our chain was replaced',
+            'new_chain': blockchain.chain
+        }
+    else:
+        response = {
+            'message': 'Our chain is authoritative',
+            'chain': blockchain.chain
+        }
+
+    return response
