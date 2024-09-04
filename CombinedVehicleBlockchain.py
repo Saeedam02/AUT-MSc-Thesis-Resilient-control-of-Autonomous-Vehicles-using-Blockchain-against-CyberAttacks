@@ -7,7 +7,7 @@ import requests
 
 class Blockchain:
     def __init__(self):
-        self.current_transactions = {}
+        self.current_transactions = []
         self.chain = []
         self.nodes = set()
 
@@ -97,7 +97,7 @@ class Blockchain:
         }
 
         # Reset the current list of transactions
-        self.current_transactions = {}
+        self.current_transactions = []
         self.chain.append(block)
         return block
 
@@ -110,8 +110,9 @@ class Blockchain:
         :param amount: Amount
         :return: The index of the Block that will hold this transaction
         """
-        self.current_transactions.update({
-            'vehicle_id': status,
+        self.current_transactions.append({
+            'vehicle_id': vehicle_id,
+            'status': status,
         })
 
         return self.last_block['index'] + 1
@@ -227,7 +228,9 @@ class Vehicle:
             'id': self.id,
             'x': self.x,
             'y': self.y,
-            'yaw': self.yaw
+            'yaw': self.yaw,
+            'vx' : self.vx,
+            'vy' : self.vy
         }
 
 # Simulation setup
@@ -243,18 +246,20 @@ if __name__ == "__main__":
     # Run the simulation for a few steps
     for step in range(10):
         for vehicle in vehicles:
+            
             vehicle.update_dynamics()
-            print(f'Vehicle {vehicle.id} at ({vehicle.x}, {vehicle.y}')
-            status = vehicle.get_state()
-            vehicle.blockchain.new_transaction(vehicle.id ,status)
+            print(f'{vehicle.id} at ({vehicle.x:.2f}, {vehicle.y})')
+            #status = vehicle.get_state()
+            #print(status)
+            #vehicle.blockchain.new_transaction(vehicle.id ,status)
 
 
         proof = blockchain.proof_of_work(blockchain.last_block)
         vehicle.blockchain.new_block(proof,blockchain.hash(blockchain.last_block))
         # You can print the blockchain state periodically to observe the transactions
-        if step % 10 == 0:
-            print(f"Blockchain at step {step}:")
-            print(json.dumps(blockchain.chain, indent=4))
+        #if step % 10 == 0:
+        print(f"Blockchain at step {step}:")
+        print(json.dumps(blockchain.chain, indent=4))
 
    
 def full_chain():
