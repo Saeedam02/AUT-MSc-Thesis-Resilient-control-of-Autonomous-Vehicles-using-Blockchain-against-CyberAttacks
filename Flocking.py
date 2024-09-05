@@ -190,16 +190,17 @@ class Vehicle:
         self.vx += control_input['vx_adjust']  # Adjust longitudinal velocity
 
         # Calculate slip angles
-        alpha_f = self.delta - (self.vy + self.lf * self.yaw_rate) / self.vx
-        alpha_r = - (self.vy - self.lr * self.yaw_rate) / self.vx
+        vx_safe = max(self.vx, 0.1) # Prevent vx from being too small
+        alpha_f = self.delta - (self.vy + self.lf * self.yaw_rate) / vx_safe
+        alpha_r = - (self.vy - self.lr * self.yaw_rate) / vx_safe
         Fyf = -self.Cf * alpha_f  # Lateral force at the front tire
         Fyr = -self.Cr * alpha_r  # Lateral force at the rear tire
 
         # Calculate state derivatives
         vy_dot = (Fyf + Fyr) / self.mass - self.vx * self.yaw_rate
         yaw_rate_dot = (self.lf * Fyf - self.lr * Fyr) / self.Iz
-        x_dot = self.vx * np.cos(self.yaw) - self.vy * self.dt
-        y_dot = self.vx * np.sin(self.yaw) + self.vy * self.dt
+        x_dot = self.vx * np.cos(self.yaw) - self.vy * np.sin(self.yaw)
+        y_dot = self.vx * np.sin(self.yaw) + self.vy * np.cos(self.yaw)
         yaw_dot = self.yaw_rate
 
         # Update the state
@@ -244,8 +245,12 @@ class Vehicle:
                 # Collision avoidance (repulsive force)
                 distance = np.sqrt((neighbor['x'] - self.x) ** 2 + (neighbor['y'] - self.y) ** 2)
                 if distance < 5:  # Consider a distance threshold for collision avoidance
-                    control_input['delta'] -= k_rep / (distance ** 2) * (self.x - neighbor['x'])  # Repulsion in x-direction
-                    control_input['delta'] -= k_rep / (distance ** 2) * (self.y - neighbor['y'])  # Repulsion in y-direction
+                    repulsion_x = k_rep / (distance ** 2) * (self.x - neighbor['x'])
+                    repulsion_y = k_rep / (distance ** 2) * (self.y - neighbor['y'])
+                    control_input['delta'] -= np.arctan2(repulsion_y, repulsion_x)
+
+                    #control_input['delta'] -= k_rep / (distance ** 2) * (self.x - neighbor['x'])  # Repulsion in x-direction
+                    #control_input['delta'] -= k_rep / (distance ** 2) * (self.y - neighbor['y'])  # Repulsion in y-direction
 
             # Compute average position and velocity of neighbors
             avg_x /= num_neighbors
@@ -253,11 +258,13 @@ class Vehicle:
             avg_vx /= num_neighbors
             avg_vy /= num_neighbors
 
+            angle_to_avg = np.arctan2(avg_y - self.y, avg_x - self.x)
+
             # Position alignment control (steering angle adjustment)
-            control_input['delta'] += k_p * ((avg_x - self.x) + (avg_y - self.y))
+            control_input['delta'] += k_p * (angle_to_avg - self.yaw)
 
             # Velocity alignment control (adjust longitudinal velocity)
-            control_input['vx_adjust'] += k_v * ((avg_vx - self.vx) + (avg_vy - self.vy))
+            control_input['vx_adjust'] += k_v * (avg_vx - self.vx)
 
         return control_input
 
