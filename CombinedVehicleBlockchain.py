@@ -195,20 +195,26 @@ class Vehicle:
         print(self.id)
 
     def update_dynamics(self):
+        # Avoid division by zero
+        if self.vx < 0.1:
+            self.vx = 0.1
+
         # Calculate slip angles
         alpha_f = self.delta - (self.vy + self.lf * self.yaw_rate) / self.vx
         alpha_r = - (self.vy - self.lr * self.yaw_rate) / self.vx
+
+        # Calculate lateral forces
         Fyf = -self.Cf * alpha_f  # Lateral force at the front tire
         Fyr = -self.Cr * alpha_r  # Lateral force at the rear tire
 
         # Calculate state derivatives
         vy_dot = (Fyf + Fyr) / self.mass - self.vx * self.yaw_rate
         yaw_rate_dot = (self.lf * Fyf - self.lr * Fyr) / self.Iz
-        x_dot = self.vx * np.cos(self.yaw) - self.vy * self.dt
-        y_dot = self.vx * np.sin(self.yaw) + self.vy * self.dt
+        x_dot = self.vx * np.cos(self.yaw) - self.vy * np.sin(self.yaw)
+        y_dot = self.vx * np.sin(self.yaw) + self.vy * np.cos(self.yaw)
         yaw_dot = self.yaw_rate
 
-        # Update the state
+        # Update the state using Euler integration
         self.vy += vy_dot * self.dt
         self.yaw_rate += yaw_rate_dot * self.dt
         self.yaw += yaw_dot * self.dt
@@ -240,11 +246,11 @@ if __name__ == "__main__":
 
     # Initialize a few vehicles with different IDs
     vehicles = [
-        Vehicle(id=f'Vehicle_{i+1}', blockchain=blockchain, x=i*10 , y=i*2) for i in range(10)
+        Vehicle(id=f'Vehicle_{i+1}', blockchain=blockchain, x=i*10 , y=i*2) for i in range(4)
     ]
 
     # Run the simulation for a few steps
-    for step in range(10):
+    for step in range(2):
         for vehicle in vehicles:
             
             vehicle.update_dynamics()
