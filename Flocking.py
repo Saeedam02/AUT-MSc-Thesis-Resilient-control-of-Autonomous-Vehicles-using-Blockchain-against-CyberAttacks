@@ -152,16 +152,17 @@ class Blockchain:
         return guess_hash[:4] == "0000"
 
 class Vehicle:
-    def __init__(self, id, blockchain, x=0.0, y=0.0, yaw=0.0, vx=10.0, vy=0.0, yaw_rate=0.0, delta=0.0):
+    def __init__(self, id, blockchain, x=0.0, y=0.0, yaw=0.0, vx=10.0, vy=0.0, r=0.0, delta=0.0, ax=0.0):
         self.id = id  # Vehicle ID
         self.x = x  # X position
         self.y = y  # Y position
         self.yaw = yaw  # Yaw angle
         self.vx = vx  # Longitudinal velocity
         self.vy = vy  # Lateral velocity
-        self.yaw_rate = yaw_rate  # Yaw rate
+        self.r = r  # Yaw rate
         self.delta = delta  # Steering angle (control input)
         self.blockchain = blockchain  # Reference to the shared blockchain
+        self.ax = ax # Longitudinal acceleration (driven by throttle or braking).
 
         # Register vehicle as a node in the blockchain network
         self.blockchain.register_node(self.id)
@@ -191,21 +192,29 @@ class Vehicle:
 
         # Calculate slip angles
         vx_safe = max(self.vx, 0.1) # Prevent vx from being too small
-        alpha_f = self.delta - (self.vy + self.lf * self.yaw_rate) / vx_safe
-        alpha_r = - (self.vy - self.lr * self.yaw_rate) / vx_safe
-        Fyf = -self.Cf * alpha_f  # Lateral force at the front tire
-        Fyr = -self.Cr * alpha_r  # Lateral force at the rear tire
+        alpha_f = self.delta - (self.vy + self.lf * self.r) / vx_safe
+        alpha_r = - (self.vy - self.lr * self.r) / vx_safe
+        Fyf = self.Cf * alpha_f  # Lateral force at the front tire
+        Fyr = self.Cr * alpha_r  # Lateral force at the rear tire
 
         # Calculate state derivatives
-        vy_dot = (Fyf + Fyr) / self.mass - self.vx * self.yaw_rate
-        yaw_rate_dot = (self.lf * Fyf - self.lr * Fyr) / self.Iz
+
+        #In reality, lateral velocity is limited by tire friction and road conditions. 
+        #damping_factor = 0.7  # Adjust this value for appropriate damping
+        vy_dot = ((Fyf + Fyr) / self.mass - self.vx * self.r) #- damping_factor * self.vy
+        vx_dot = self.ax - (self.r * self.vy)
+        r_dot = (self.lf * Fyf - self.lr * Fyr) / self.Iz
         x_dot = self.vx * np.cos(self.yaw) - self.vy * np.sin(self.yaw)
         y_dot = self.vx * np.sin(self.yaw) + self.vy * np.cos(self.yaw)
-        yaw_dot = self.yaw_rate
+        yaw_dot = (self.vx / (self.lf + self.lr)) * np.tan(self.delta)
+
+        # Longitudinal velocity affected by drag to keep it realistic
+        #drag_force = 0.01 * self.vx ** 2  # Drag proportional to the square of vx
+        self.vx += vx_dot * self.dt
 
         # Update the state
         self.vy += vy_dot * self.dt
-        self.yaw_rate += yaw_rate_dot * self.dt
+        self.r += r_dot * self.dt
         self.yaw += yaw_dot * self.dt
         self.x += x_dot * self.dt
         self.y += y_dot * self.dt
@@ -274,6 +283,10 @@ class Vehicle:
         self.blockchain.new_transaction(vehicle_id=self.id, status=state)
 
     def get_state(self):
+        """
+        Get the current state of the vehicle
+        :return: A dictionary containing the vehicle's state
+        """
         return {
             'id': self.id,
             'x': self.x,
@@ -282,6 +295,13 @@ class Vehicle:
             'vx': self.vx,
             'vy': self.vy
         }
+    
+    def get_velocity(self):
+        """
+        Calculate and return the total velocity of the vehicle.
+        :return: The magnitude of the total velocity.
+        """
+        return np.sqrt(self.vx**2 + self.vy**2)
 
 def get_neighbors_info(block, vehicle_id):
     """
