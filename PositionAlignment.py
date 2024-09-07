@@ -244,6 +244,13 @@ class Vehicle:
             'vx': self.vx,
             'vy': self.vy
         }
+    
+    def get_velocity(self):
+        """
+        Calculate and return the total velocity of the vehicle.
+        :return: The magnitude of the total velocity.
+        """
+        return np.sqrt(self.vx**2 + self.vy**2)
 
 def get_neighbors_info(block, vehicle_id):
     """
