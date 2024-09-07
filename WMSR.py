@@ -100,27 +100,37 @@ class Blockchain:
 
 
 class Vehicle:
-    def __init__(self, id, blockchain, is_malicious=False, x=0.0, y=0.0, yaw=0.0, vx=10.0, vy=0.0, yaw_rate=0.0, delta=0.0):
-        self.id = id
-        self.x = x
-        self.y = y
-        self.yaw = yaw
-        self.vx = vx
-        self.vy = vy
-        self.yaw_rate = yaw_rate
-        self.delta = delta
+    def __init__(self, id, blockchain, is_malicious=False, x=0.0, y=0.0, yaw=0.0, vx=10.0, vy=0.0, r=0.0, delta=0.0, ax=0.0):
+        self.id = id  # Vehicle ID
+        self.x = x  # X position
+        self.y = y  # Y position
+        self.yaw = yaw  # Yaw angle
+        self.vx = vx  # Longitudinal velocity
+        self.vy = vy  # Lateral velocity
+        self.r = r  # Yaw rate
+        self.delta = delta  # Steering angle (control input)
+        self.blockchain = blockchain  # Reference to the shared blockchain
+        self.ax = ax # Longitudinal acceleration (driven by throttle or braking).
+
         self.is_malicious = is_malicious  # Flag for malicious agents
-        self.blockchain = blockchain
+
+        # Register vehicle as a node in the blockchain network
         self.blockchain.register_node(self.id)
-        self.mass = 1500
-        self.lf = 1.2
-        self.lr = 1.6
-        self.Iz = 2250
-        self.Cf = 19000
-        self.Cr = 33000
-        self.dt = 0.01
+
+        # Vehicle-specific parameters
+        self.mass = 1500  # kg
+        self.lf = 1.2  # Distance from CG to front axle (m)
+        self.lr = 1.6  # Distance from CG to rear axle (m)
+        self.Iz = 2250  # Yaw moment of inertia (kg*m^2)
+        self.Cf = 19000  # Cornering stiffness front (N/rad)
+        self.Cr = 33000  # Cornering stiffness rear (N/rad)
+        self.dt = 0.01  # Time step (s)
+    
 
     def update_dynamics(self, neighbors_info):
+        """
+        Update the vehicle's state based on the bicycle model dynamics
+        """
         control_input = self.compute_control_input(neighbors_info)
         self.delta = control_input['delta']
         self.vx += control_input['vx_adjust']
@@ -129,23 +139,31 @@ class Vehicle:
         vx_safe = max(self.vx, 0.1)
 
         # Calculate slip angles
-        alpha_f = self.delta - (self.vy + self.lf * self.yaw_rate) / vx_safe
-        alpha_r = - (self.vy - self.lr * self.yaw_rate) / vx_safe
+        alpha_f = self.delta - (self.vy + self.lf * self.r) / vx_safe
+        alpha_r = - (self.vy - self.lr * self.r) / vx_safe
 
         # Lateral forces
-        Fyf = -self.Cf * alpha_f
-        Fyr = -self.Cr * alpha_r
+        Fyf = self.Cf * alpha_f
+        Fyr = self.Cr * alpha_r
 
-        # State derivatives
-        vy_dot = (Fyf + Fyr) / self.mass - self.vx * self.yaw_rate
-        yaw_rate_dot = (self.lf * Fyf - self.lr * Fyr) / self.Iz
+        # Calculate state derivatives
+
+        #In reality, lateral velocity is limited by tire friction and road conditions. 
+        #damping_factor = 0.7  # Adjust this value for appropriate damping
+        vy_dot = ((Fyf + Fyr) / self.mass - self.vx * self.r) #- damping_factor * self.vy
+        vx_dot = self.ax - (self.r * self.vy)
+        r_dot = (self.lf * Fyf - self.lr * Fyr) / self.Iz
         x_dot = self.vx * np.cos(self.yaw) - self.vy * np.sin(self.yaw)
         y_dot = self.vx * np.sin(self.yaw) + self.vy * np.cos(self.yaw)
-        yaw_dot = self.yaw_rate
+        yaw_dot = (self.vx / (self.lf + self.lr)) * np.tan(self.delta)
 
-        # Update state
+        # Longitudinal velocity affected by drag to keep it realistic
+        #drag_force = 0.01 * self.vx ** 2  # Drag proportional to the square of vx
+        self.vx += vx_dot * self.dt
+
+        # Update the state
         self.vy += vy_dot * self.dt
-        self.yaw_rate += yaw_rate_dot * self.dt
+        self.r += r_dot * self.dt
         self.yaw += yaw_dot * self.dt
         self.x += x_dot * self.dt
         self.y += y_dot * self.dt
