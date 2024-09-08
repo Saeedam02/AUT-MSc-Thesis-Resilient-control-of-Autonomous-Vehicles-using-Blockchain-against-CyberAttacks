@@ -1,6 +1,7 @@
 import hashlib
 import json
 import numpy as np
+import matplotlib.pyplot as plt
 from time import time
 from uuid import uuid4
 
@@ -99,18 +100,18 @@ class Blockchain:
         return guess_hash[:4] == "0000"
 
 
-# Vehicle dynamic model (bicycle model)
-
+#Vehicle dynamic model (bicycle model)
 class Vehicle:
-    def __init__(self, id, x=0.0, y=0.0, yaw=0.0, vx=10.0, vy=0.0, yaw_rate=0.0, delta=0.0):
+    def __init__(self, id, x=0.0, y=0.0, yaw=0.0, vx=10.0, vy=0.0, r=0.0, delta=0.0, ax=0.0):
         self.id = id  # Vehicle ID
         self.x = x  # X position
         self.y = y  # Y position
         self.yaw = yaw  # Yaw angle
         self.vx = vx  # Longitudinal velocity
         self.vy = vy  # Lateral velocity
-        self.yaw_rate = yaw_rate  # Yaw rate
+        self.r = r  # Yaw rate
         self.delta = delta  # Steering angle (control input)
+        self.ax = ax # Longitudinal acceleration (driven by throttle or braking).
 
         # Vehicle-specific parameters
         self.mass = 1500  # kg
@@ -118,30 +119,42 @@ class Vehicle:
         self.lr = 1.6  # Distance from CG to rear axle (m)
         self.Iz = 2250  # Yaw moment of inertia (kg*m^2)
         self.Cf = 19000  # Cornering stiffness front (N/rad)
-        self.Cr = 33000  # Cornering stiffness rear (N/rad)
+        self.Cr = 20000  # Cornering stiffness rear (N/rad)
         self.dt = 0.01  # Time step (s)
 
     def update_dynamics(self):
         """
         Update the vehicle's state based on the bicycle model dynamics
         """
-        # Calculate slip angles
-        alpha_f = self.delta - (self.vy + self.lf * self.yaw_rate) / self.vx
-        alpha_r = - (self.vy - self.lr * self.yaw_rate) / self.vx
-        Fyf = -self.Cf * alpha_f  # Lateral force at the front tire
-        Fyr = -self.Cr * alpha_r  # Lateral force at the rear tire
+        # Calculate slip angles (clamped to avoid excessive forces)
+        #alpha_f = np.clip(self.delta - (self.vy + self.lf * self.r) / self.vx, -0.1, 0.1)
+        #alpha_r = np.clip(-(self.vy - self.lr * self.r) / self.vx, -0.1, 0.1)
+
+        alpha_f = self.delta - (self.vy + self.lf * self.r) / self.vx
+        alpha_r = - (self.vy - self.lr * self.r) / self.vx
+
+
+        Fyf = self.Cf * alpha_f  # Lateral force at the front tire
+        Fyr = self.Cr * alpha_r  # Lateral force at the rear tire
 
         # Calculate state derivatives
-        vy_dot = (Fyf + Fyr) / self.mass - self.vx * self.yaw_rate
-        yaw_rate_dot = (self.lf * Fyf - self.lr * Fyr) / self.Iz
-        x_dot = self.vx * np.cos(self.yaw) - self.vy * np.sin(self.yaw
-)
+
+        #In reality, lateral velocity is limited by tire friction and road conditions. 
+        #damping_factor = 0.7  # Adjust this value for appropriate damping
+        vy_dot = ((Fyf + Fyr) / self.mass - self.vx * self.r) #- damping_factor * self.vy
+        vx_dot = self.ax - (self.r * self.vy)
+        r_dot = (self.lf * Fyf - self.lr * Fyr) / self.Iz
+        x_dot = self.vx * np.cos(self.yaw) - self.vy * np.sin(self.yaw)
         y_dot = self.vx * np.sin(self.yaw) + self.vy * np.cos(self.yaw)
-        yaw_dot = self.yaw_rate
+        yaw_dot = (self.vx / (self.lf + self.lr)) * np.tan(self.delta)
+
+        # Longitudinal velocity affected by drag to keep it realistic
+        #drag_force = 0.01 * self.vx ** 2  # Drag proportional to the square of vx
+        self.vx += vx_dot * self.dt
 
         # Update the state
         self.vy += vy_dot * self.dt
-        self.yaw_rate += yaw_rate_dot * self.dt
+        self.r += r_dot * self.dt
         self.yaw += yaw_dot * self.dt
         self.x += x_dot * self.dt
         self.y += y_dot * self.dt
@@ -158,6 +171,12 @@ class Vehicle:
             'yaw': self.yaw
         }
 
+    def get_velocity(self):
+        """
+        Calculate and return the total velocity of the vehicle.
+        :return: The magnitude of the total velocity.
+        """
+        return np.sqrt(self.vx**2 + self.vy**2)
 # Flocking algorithm
 
 def flocking_vehicles(vehicles):
@@ -226,19 +245,41 @@ def communicate_states(vehicles, blockchain):
         proof = blockchain.proof_of_work(blockchain.last_block)
         blockchain.new_block(proof, blockchain.hash(blockchain.last_block))
 
+
+
+
 # Initialize vehicles and blockchain
 
 vehicles = [Vehicle(id=i) for i in range(5)]  # Create 5 vehicles
 blockchain = Blockchain()  # Create a blockchain
 
+# Store history for plotting
+
+x_histories = [[] for _ in range(len(vehicles))]
+y_histories = [[] for _ in range(len(vehicles))]
+
 # Simulation loop
 
-for t in range(100):  # Run for 100 time steps
-    flocking_vehicles(vehicles)  # Apply flocking behavior
-    communicate_states(vehicles, blockchain)  # Share states via blockchain
+for t in range(100):
+    flocking_vehicles(vehicles)
+    communicate_states(vehicles, blockchain)
 
     for vehicle in vehicles:
-        vehicle.update_dynamics()  # Update vehicle dynamics
+        vehicle.update_dynamics()
+        x_histories[vehicle.id].append(vehicle.x)
+        y_histories[vehicle.id].append(vehicle.y)
+
+# Plot the trajectories of the vehicles
+
+plt.figure(figsize=(10, 8))
+for i in range(len(vehicles)):
+    plt.plot(x_histories[i], y_histories[i], label=f'Vehicle {i}')
+plt.xlabel('X Position (m)')
+plt.ylabel('Y Position (m)')
+plt.title('Vehicle Trajectories in Flocking Simulation')
+plt.legend()
+plt.grid(True)
+plt.show()
 
 # Print the final blockchain state for inspection
 
