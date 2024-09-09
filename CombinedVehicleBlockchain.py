@@ -44,6 +44,18 @@ class Blockchain:
             current_index += 1
 
         return True
+    def get_transaction(self , last_block):
+        """
+        To Pull out the transactions from the Last Block.
+        """
+
+        trxs = last_block['transactions'] # this is a list
+       
+        status = trxs[0] # this is a dict
+
+        mystate = status['status'] #this is a dict
+        return mystate
+
 
     def resolve_conflicts(self):
         """
@@ -166,6 +178,7 @@ class Blockchain:
         guess = f'{last_proof}{proof}{last_hash}'.encode()
         guess_hash = hashlib.sha256(guess).hexdigest()
         return guess_hash[:4] == "0000"
+    
 
 class Vehicle:
     def __init__(self, id, blockchain, x=0.0, y=0.0, yaw=0.0, vx=10.0, vy=0.0, r=0.0, delta=0.0, ax=0.0):
@@ -277,9 +290,9 @@ if __name__ == "__main__":
         for vehicle in vehicles:
             
             vehicle.update_dynamics()
-            print(f'{vehicle.id} at ({vehicle.x:.2f}, {vehicle.y})')
+            #print(f'{vehicle.id} at ({vehicle.x:.2f}, {vehicle.y})')
             status = vehicle.get_state()
-            print(status)
+            #print(status)
             #vehicle.blockchain.new_transaction(vehicle.id ,status)
 
 
@@ -287,8 +300,10 @@ if __name__ == "__main__":
         vehicle.blockchain.new_block(proof,blockchain.hash(blockchain.last_block))
         # You can print the blockchain state periodically to observe the transactions
         #if step % 10 == 0:
-        print(f"Blockchain at step {step}:")
-        print(json.dumps(blockchain.chain, indent=4))
+        # print(f"Blockchain at step {step}:")
+        # print(json.dumps(blockchain.chain, indent=4))
+        blockchain.get_transaction(blockchain.last_block)
+        break
 
    
 def full_chain():
