@@ -115,9 +115,15 @@ for t in range(time_steps):
     # Sinusoidal steering input (delta) with time
     delta = 0.1 * np.sin(0.2 * t * vehicle.dt)  # Steering angle (radians)
     delta_his.append(delta)
-
-    a = 0  # Constant acceleration (m/s^2)
     
+    #Fixed Acceleration Based on Tire Slip and Rolling Resistance:
+    # a = 0.1 # Constant acceleration (m/s^2)
+
+    #Proportional Control to Target Speed:
+    v_target = 10.0  # Target longitudinal speed (m/s)
+    k_p = 0.8  # Proportional gain
+    a = k_p * (v_target - vehicle.v_x)
+
     # Update vehicle state
     vehicle.update(a, delta)
     
@@ -161,4 +167,5 @@ plt.title('Longitudinal and Lateral Velocities Over Time')
 plt.legend()
 plt.grid(True)
 plt.show()
+
 
