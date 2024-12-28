@@ -3,7 +3,7 @@ import json
 import numpy as np
 import matplotlib.pyplot as plt
 import random
-import time
+from time import time, sleep
 from collections import deque
 from datetime import datetime
 import logging
@@ -153,7 +153,7 @@ class Blockchain:
         """
         block = {
             'index': len(self.chain) + 1,
-            'timestamp': time.time(),
+            'timestamp': time(),
             'transactions': self.current_transactions,
             'proof': proof,
             'previous_hash': previous_hash or self.hash(self.chain[-1]),
@@ -254,7 +254,7 @@ class DynamicBicycleModel:
         # Local DDoS/flood simulation
         self.message_queue = deque(maxlen=1000)
         self.processing_delay = 0.001
-        self.last_update_time = time.time()
+        self.last_update_time = time()
 
         # Recovery mode if local anomalies are detected
         self.recovery_mode = False
@@ -279,17 +279,17 @@ class DynamicBicycleModel:
         Process local message queue -> check anomalies -> possibly recover -> record velocity
         Then publish final state to blockchain (transactions).
         """
-        current_time = time.time()
+        current_time = time()
         time_delta = current_time - self.last_update_time
         self.last_update_time = current_time
 
         # Process messages up to a small time budget to simulate limited CPU
-        start_time = time.time()
+        start_time = time()
         messages_processed = 0
-        while self.message_queue and (time.time() - start_time) < 0.1:
+        while self.message_queue and (time() - start_time) < 0.1:
             self.message_queue.popleft()
             messages_processed += 1
-            time.sleep(self.processing_delay)
+            sleep(self.processing_delay)
 
         # Track queue size + velocity in security monitor
         queue_size = len(self.message_queue)
@@ -383,7 +383,7 @@ class DynamicBicycleModel:
             veh_id = txn['vehicle_id']
             status = txn['status']
             for ag in agents:
-                print(ag.id)
+                #print(ag.id)
                 if ag.id == veh_id:
                     # e.g., unify x, vx from the chain
                     ag.x = status['x']
@@ -401,7 +401,7 @@ def simulate_network_attack(vehicles, target_ids, intensity=1000, attack_type="f
         if vehicle.id in target_ids:
             if attack_type == "flood":
                 flood_messages = [
-                    {'timestamp': time.time(), 'type': 'status_update'} 
+                    {'timestamp': time(), 'type': 'status_update'} 
                     for _ in range(intensity)
                 ]
                 vehicle.message_queue.extend(flood_messages)
@@ -416,6 +416,7 @@ class LeaderFollowerSimulation:
     def __init__(self, num_followers, blockchain):
         self.blockchain = blockchain
         self.security_monitor = SecurityMonitor()
+        self.elapsed_times = []  # List to store elapsed times for each step
 
         # Create leader
         self.leader = DynamicBicycleModel(
@@ -501,11 +502,18 @@ class LeaderFollowerSimulation:
 
             # 3) Blockchain checks & mining each step
             # - check for FDI vs. leader velocity, etc.
+            start_time = time()
             blockchain.check_for_attacks(step, self.leader.v_x)
 
             proof = blockchain.proof_of_work(blockchain.last_block)
             blockchain.new_block(proof, blockchain.hash(blockchain.last_block))
+            end_time = time()
+            # Calculate the time taken for the loop to complete
+            elapsed_time = end_time - start_time
+            self.elapsed_times.append(elapsed_time)  # Store elapsed time
 
+            print(f"Total simulation time_delay: {elapsed_time:.6f} seconds")
+            print('************************')
             # 4) Reconcile states from the chain (optional)
             for i, follower in enumerate(self.followers):
                 follower.check_and_update_from_blockchain(self.followers)
@@ -526,7 +534,8 @@ class LeaderFollowerSimulation:
         self.plot_trajectory_snapshots()
         self.plot_velocity_consensus()
         self.plot_min_distances()
-
+        self.plot_elapsed_times()
+        
     def log_system_status(self, step):
         logging.info(f"Step {step} - System Status:")
         for v in self.vehicles:
@@ -593,7 +602,15 @@ class LeaderFollowerSimulation:
         plt.tight_layout()
         plt.show()
 
-
+    def plot_elapsed_times(self):
+        plt.figure(figsize=(10, 6))
+        plt.bar(range(len(self.elapsed_times)), self.elapsed_times, color='blue')
+        plt.xlabel('Simulation Step')
+        plt.ylabel('Elapsed Time (seconds)')
+        plt.title('Elapsed Time per Simulation Step')
+        plt.grid(axis='y')
+        plt.tight_layout()
+        plt.show()
 ###############################################################################
 # Main Execution
 ###############################################################################
@@ -622,3 +639,4 @@ if __name__ == "__main__":
         logging.info(f"[Blockchain] Suspicious Nodes: {blockchain.suspicious_nodes}")
     else:
         logging.info("[Blockchain] No suspicious nodes flagged.")
+
