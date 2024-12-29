@@ -124,7 +124,31 @@ class LeaderFollowerSimulation:
         self.y_history = [[] for _ in range(num_followers+1)]
         self.v_history = [[] for _ in range(num_followers+1)]
         self.min_distances = []
+        self.ttc_history = []  # Track minimum TTC over time
         self.time_points = np.arange(0, self.time_steps)*self.dt
+
+    def calculate_ttc(self):
+        """
+        Calculate Time to Collision (TTC) for all vehicles.
+        """
+        ttc_values = []
+        for i in range(1, len(self.vehicles)):  # Start from the first follower
+            leader = self.vehicles[i - 1]
+            follower = self.vehicles[i]
+
+            relative_velocity = follower.v_x - leader.v_x
+            relative_position = leader.x - follower.x - self.desired_gap
+
+            # Calculate TTC only if conditions are valid
+            if relative_position > 0 and relative_velocity > 0:
+                ttc = relative_position / relative_velocity
+            else:
+                ttc = float('inf')  # No collision risk or invalid position
+
+            ttc_values.append(ttc)
+
+        return min(ttc_values)  # Return the minimum TTC across all pairs
+
 
     def run_simulation(self, spoof_params=None):
         """
@@ -139,6 +163,7 @@ class LeaderFollowerSimulation:
             target_id = spoof_params.get('target_id', None)
 
         for step in range(self.time_steps):
+            print('Step:', step)
             # 1) Leader update
             v_target = 6.0
             kp = 1.0
@@ -172,18 +197,37 @@ class LeaderFollowerSimulation:
 
             self.min_distances.append(min_dist)
 
-            # 3) Possibly do a spoofing attack at a specific step
-            if step == spoof_step and attacker_id is not None and target_id is not None:
-                simulate_spoofing_attack(self.vehicles, attacker_id, target_id)
+            # Calculate and store TTC
+            min_ttc = self.calculate_ttc()
+            self.ttc_history.append(min_ttc)
 
+            # 3) Possibly do a spoofing attack at a specific step
+            if spoof_step < step < spoof_step + 5 and attacker_id is not None and target_id is not None:
+                simulate_spoofing_attack(self.vehicles, attacker_id, target_id)
+        #print(self.ttc_history)
         # After the simulation, plot results
         self.plot_trajectory_snapshots()
-        self.plot_velocity_consensus()
-        self.plot_min_distances()
+        self.plot_velocity_and_min_distance()  # Updated function call
+        self.plot_ttc_over_time()
+
+    def plot_ttc_over_time(self):
+        """
+        Plot the Time to Collision (TTC) over time.
+        """
+        plt.figure(figsize=(10, 6))
+        plt.plot(self.time_points, self.ttc_history, 'g-', label='Minimum TTC')
+        plt.axhline(y=1, color='r', linestyle='--', label='TTC Threshold (1s)')
+        plt.axhline(y=2, color='orange', linestyle='--', label='TTC Threshold (2s)')
+        plt.xlabel('Time [s]')
+        plt.ylabel('TTC [s]')
+        plt.title('Time to Collision (TTC) Over Time')
+        plt.legend()
+        plt.grid(True)
+        plt.tight_layout()
+        plt.show()
 
     def plot_trajectory_snapshots(self):
         plt.figure(figsize=(15, 8))
-        plt.suptitle('Vehicle Platooning Trajectory Snapshots (No Blockchain)', fontsize=14)
         t_samples = [
             int(self.time_steps*0.01), int(self.time_steps*0.2),
             int(self.time_steps*0.4),  int(self.time_steps*0.6),
@@ -208,33 +252,35 @@ class LeaderFollowerSimulation:
         plt.tight_layout()
         plt.show()
 
-    def plot_velocity_consensus(self):
-        plt.figure(figsize=(10, 6))
-        colors = plt.cm.Set1(np.linspace(0, 1, len(self.vehicles)))
+    def plot_velocity_and_min_distance(self):
+        """
+        Plot Velocity Consensus and Minimum Distance in one figure.
+        """
+        plt.figure(figsize=(10, 12))
+
+        # Subplot for Velocity Consensus
+        plt.subplot(2, 1, 1)  # 2 rows, 1 column, 1st subplot
+        colors = plt.cm.viridis(np.linspace(0, 1, len(self.vehicles)))  # Use viridis colormap
         for i, veh in enumerate(self.vehicles):
             label = 'Leader' if i == 0 else f'Follower {i}'
             plt.plot(self.time_points, self.v_history[i], label=label, color=colors[i], linewidth=2.0)
         plt.xlabel('Time [s]')
         plt.ylabel('Velocity [m/s]')
-        plt.title('Velocity of All Vehicles Over Time (No Blockchain)')
         plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
         plt.grid(True)
-        plt.ylim(0, 40)  # Extended range to see big spoof effect
-        plt.tight_layout()
-        plt.show()
+        plt.ylim(-40, 40)  # Adjusted range to see big spoof effect
 
-    def plot_min_distances(self):
-        plt.figure(figsize=(10, 6))
+        # Subplot for Minimum Distance
+        plt.subplot(2, 1, 2)  # 2 rows, 1 column, 2nd subplot
         plt.plot(self.time_points, self.min_distances, 'b-', label='Min Distance')
         plt.axhline(y=self.desired_gap, color='r', linestyle='--', label='Desired Gap')
         plt.xlabel('Time [s]')
         plt.ylabel('Distance [m]')
-        plt.title('Minimum Inter-Vehicle Distance (No Blockchain)')
         plt.legend()
         plt.grid(True)
+
         plt.tight_layout()
         plt.show()
-
 ###############################################################################
 # Main Execution
 ###############################################################################
