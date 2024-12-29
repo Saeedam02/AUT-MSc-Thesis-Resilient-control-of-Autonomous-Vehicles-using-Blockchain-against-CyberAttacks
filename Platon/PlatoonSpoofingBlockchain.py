@@ -363,10 +363,6 @@ def simulate_spoofing_attack(blockchain, malicious_vehicle, spoofed_id):
     # Attempt to add the transaction to the blockchain
     blockchain.new_transaction(vehicle_id=spoofed_id, status=fake_state, signature=signature)
 
- 
-    # Attempt to add the transaction to the blockchain
-    blockchain.new_transaction(vehicle_id=spoofed_id, status=fake_state, signature=signature)
-
     # Check if the last transaction was accepted or rejected
     if blockchain.current_transactions:
         if blockchain.current_transactions[-1]['vehicle_id'] == spoofed_id:
@@ -413,6 +409,9 @@ class LeaderFollowerSimulation:
         time_points = np.arange(0, self.time_steps)*self.dt
 
         for t in range(self.time_steps):
+            print('****************')
+            print('Step:', t)
+
             # Leader update
             v_target = 6.0
             kp = 1.0
@@ -479,15 +478,13 @@ class LeaderFollowerSimulation:
         plt.bar(range(len(self.elapsed_times)), self.elapsed_times, color='blue')
         plt.xlabel('Simulation Step')
         plt.ylabel('Elapsed Time (seconds)')
-        plt.title('Elapsed Time per Simulation Step')
         plt.grid(axis='y')
         plt.tight_layout()
         plt.show()
 
     def plot_results(self, x_history, y_history, v_history, min_distances, time_points):
-        # 1) Trajectory snapshots
+        # 1) Trajectory 
         plt.figure(figsize=(15, 8))
-        plt.suptitle('Vehicle Platooning Trajectory Snapshots', fontsize=14)
         t_samples = [int(self.time_steps*0.01), int(self.time_steps*0.2), int(self.time_steps*0.4),
                      int(self.time_steps*0.6), int(self.time_steps*0.8), int(self.time_steps*0.99)]
         for idx, t in enumerate(t_samples):
@@ -507,35 +504,33 @@ class LeaderFollowerSimulation:
         plt.tight_layout()
         plt.show()
 
-        # 2) We can also plot velocity over time in a simpler manner
-        # or we gather them from blockchain states if we want a more advanced approach.
-        plt.figure(figsize=(10, 6))
-        colors = plt.cm.Set1(np.linspace(0, 1, self.num_followers+1))
-        for i in range(self.num_followers+1):
+        # 2) Combine Velocity and Minimum Distance plots
+        plt.figure(figsize=(10, 12))
+
+        # Subplot for Velocity Consensus
+        plt.subplot(2, 1, 1)  # 2 rows, 1 column, 1st subplot
+        colors = plt.cm.viridis(np.linspace(0, 1, self.num_followers + 1))  # Use viridis colormap
+        for i in range(self.num_followers + 1):
             label = 'Leader' if i == 0 else f'Follower {i}'
             plt.plot(time_points, v_history[i], label=label, color=colors[i], linewidth=2)
         plt.xlabel('Time [s]')
         plt.ylabel('Velocity [m/s]')
-        plt.title('Velocity of All Vehicles Over Time')
         plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
         plt.grid(True)
         plt.ylim(0, 15)
-        plt.tight_layout()
-        plt.show()
 
-        # 3) Min distances
-        plt.figure(figsize=(10,6))
+        # Subplot for Minimum Distance
+        plt.subplot(2, 1, 2)  # 2 rows, 1 column, 2nd subplot
         plt.plot(time_points, min_distances, 'b-', label='Min Distance')
         plt.axhline(y=self.desired_gap, color='r', linestyle='--', label='Desired Gap')
         plt.xlabel('Time [s]')
         plt.ylabel('Distance [m]')
-        plt.title('Minimum Inter-Vehicle Distance Over Time')
         plt.legend()
         plt.grid(True)
         plt.ylim(5, 15)
+
         plt.tight_layout()
         plt.show()
-
 
 ###############################################################################
 # MAIN EXECUTION
