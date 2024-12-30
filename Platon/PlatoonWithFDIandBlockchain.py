@@ -199,7 +199,7 @@ class Blockchain:
         current = current_velocity['vx']
         # print('current:',current)
         # print('consensus:',consensus_velocity)
-        tolerance = 5  # Define a tolerance level for consistency check
+        tolerance = 0.5  # Define a tolerance level for consistency check
 
         if abs(current - consensus_velocity) > tolerance:
             return False
@@ -328,7 +328,7 @@ class DynamicBicycleModel:
     def broadcast_state(self):
         # Create a transaction that represents the vehicle's state
         state = self.get_state()
-        self.blockchain.new_transaction(vehicle_id=self.id, status=state)
+        blockchain.new_transaction(vehicle_id=self.id, status=state)
 
     def get_state(self):
         """
@@ -384,8 +384,60 @@ class LeaderFollowerSimulation:
         self.dt = 0.05
         self.time_steps = int(50 / self.dt)
         self.road_width = 20  # Width of the road (meters)
+        self.elapsed_times = []  # List to store elapsed times for each step
+        self.ttc_history = []  # Track minimum TTC over time
 
-    def run_simulation(self):
+    def fdi_attack(self, follower, step):
+        """
+        Simulate a more logical FDI attack by gradually altering the follower's state.
+        """
+        # Gradually increase the follower's velocity
+        if 30 < step < 50 and follower.id == 3 :
+            attack_intensity = (step - 30) / 20  # Scale from 0 to 1
+            follower.v_x += attack_intensity * random.uniform(2, 5)  # Gradual increase in velocity
+            print(f"FDI attack on vehicle {follower.id} at step {step}: new velocity {follower.v_x:.2f}")
+            
+        elif 30 < step < 50 and follower.id == 9 :
+            attack_intensity = (step - 30) / 20  # Scale from 0 to 1
+            follower.v_x -= attack_intensity * random.uniform(2, 5)  # Gradual increase in velocity
+            print(f"FDI attack on vehicle {follower.id} at step {step}: new velocity {follower.v_x:.2f}")
+
+    def calculate_ttc(self):
+        """
+        Calculate Time to Collision (TTC) for all vehicles.
+        """
+        ttc_values = []
+        
+        # Leader-to-first-follower TTC
+        leader = self.leader
+        first_follower = self.followers[0]
+        relative_velocity = first_follower.v_x - leader.v_x
+        relative_position = leader.x - first_follower.x - self.desired_gap
+
+        if relative_position > 0 and relative_velocity > 0:
+            ttc = relative_position / relative_velocity
+        else:
+            ttc = float('inf')  # No collision risk or invalid scenario
+
+        ttc_values.append(ttc)
+
+        # Follower-to-follower TTC
+        for i in range(1, len(self.followers)):
+            leader = self.followers[i - 1]
+            follower = self.followers[i]
+            relative_velocity = follower.v_x - leader.v_x
+            relative_position = leader.x - follower.x - self.desired_gap
+
+            if relative_position > 0 and relative_velocity > 0:
+                ttc = relative_position / relative_velocity
+            else:
+                ttc = float('inf')  # No collision risk or invalid scenario
+
+            ttc_values.append(ttc)
+
+        return min(ttc_values)  # Return the minimum TTC across all pairs
+
+    def run_simulation(self,attack_id):
         x_history = [[] for _ in range(self.num_followers + 1)]
         y_history = [[] for _ in range(self.num_followers + 1)]
         v_history = [[] for _ in range(self.num_followers + 1)]
@@ -397,7 +449,7 @@ class LeaderFollowerSimulation:
             v_target = 6.0
             k_p = 1
             a_l = k_p * (v_target - self.leader.v_x)
-            self.leader.update(0, 0)
+            self.leader.update(a_l, 0)
 
             # Save leader's position and velocity
             x_history[0].append(self.leader.x)
@@ -412,12 +464,12 @@ class LeaderFollowerSimulation:
                 k_p_follower = 1 
                 distance_to_leader = self.leader.x - follower.x - self.desired_gap * (i + 1)
                 a_f = k_p_follower * distance_to_leader
-                if 30 <t< 35 and i == 8:
-                    # Modify the velocity drastically to simulate an attack
-                    follower.v_x += random.uniform(5, 10)  # Add an unrealistic jump in velocity
-                    print(f"Cyber attack introduced to vehicle {follower.id} at step {t}")
 
-                follower.update(0, 0)
+                # Apply FDI attack
+                if follower.id in attack_id:
+                    self.fdi_attack(follower, t)
+
+                follower.update(a_f, 0)
 
                 x_history[i + 1].append(follower.x)
                 y_history[i + 1].append(follower.y)
@@ -432,18 +484,27 @@ class LeaderFollowerSimulation:
 
             min_distances.append(min_dist_timestep)
 
+            start_time = time()
             # Pass the current step to `check_for_attacks()`
             blockchain.check_for_attacks(current_step=t ,v_l=self.leader.v_x)
             # Mine a new block after all vehicles have updated their states
             proof = blockchain.proof_of_work(blockchain.last_block)
             blockchain.new_block(proof, blockchain.hash(blockchain.last_block))
+
+            end_time = time()
+            # Calculate the time taken for the loop to complete
+            elapsed_time = end_time - start_time
+            self.elapsed_times.append(elapsed_time)  # Store elapsed time
+
+            # print(f"Total simulation time_delay: {elapsed_time:.6f} seconds")
+            # print('************************')
+
             for i, follower in enumerate(self.followers):
                 follower.check_and_update_agents_from_blockchain(self.followers)
                 v_history[i + 1].append(follower.v_x)
 
         # Plot 1: Trajectory snapshots [same as before]
         plt.figure(figsize=(15, 8))
-        plt.suptitle('Vehicle Platooning Trajectory Snapshots', fontsize=14)
         t_samples = [int(self.time_steps * 0.01), int(self.time_steps * 0.2), int(self.time_steps * 0.4),
                      int(self.time_steps * 0.6), int(self.time_steps * 0.8), int(self.time_steps * 0.99)]
         
@@ -462,37 +523,65 @@ class LeaderFollowerSimulation:
         plt.tight_layout()
         plt.show()
 
-        # Plot 2: Velocity consensus with zoomed y-axis
-        plt.figure(figsize=(10, 6))
-        colors = plt.cm.rainbow(np.linspace(0, 1, self.num_followers + 1))
+    # Create a figure with two subplots
+        plt.figure(figsize=(10, 12))
+
+        # Subplot for Velocity Consensus
+        plt.subplot(2, 1, 1)  # 2 rows, 1 column, 1st subplot
+        colors = plt.cm.viridis(np.linspace(0, 1, self.num_followers + 1))  # Use viridis colormap
         for i in range(self.num_followers + 1):
             label = 'Leader' if i == 0 else f'Follower {i}'
-            plt.plot(time_points, v_history[i], label=label, color=colors[i], linewidth=1)
+            plt.plot(np.arange(0, self.time_steps) * self.dt, v_history[i], label=label, color=colors[i], linewidth=1)
         plt.xlabel('Time [s]')
         plt.ylabel('Velocity [m/s]')
-        plt.title('Velocity Consensus Over Time')
         plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
         plt.grid(True)
-        # Set y-axis limits to better show velocity differences
-        plt.ylim(0, 20)
-        plt.tight_layout()
-        plt.show()
+        plt.ylim(-40, 40)  # Adjusted range to see big spoof effect
 
-        # Plot 3: Minimum distances [same as before]
-        plt.figure(figsize=(10, 6))
-        plt.plot(time_points, min_distances, 'b-', label='Minimum Distance')
+        # Subplot for Minimum Distance
+        plt.subplot(2, 1, 2)  # 2 rows, 1 column, 2nd subplot
+        plt.plot(np.arange(0, self.time_steps) * self.dt, min_distances, 'b-', label='Minimum Distance')
         plt.axhline(y=self.desired_gap, color='r', linestyle='--', label='Desired Gap')
         plt.xlabel('Time [s]')
         plt.ylabel('Distance [m]')
-        plt.title('Minimum Inter-Vehicle Distance Over Time')
         plt.legend()
         plt.grid(True)
+
         plt.tight_layout()
         plt.show()
 
+        self.plot_elapsed_times()
+
+    def plot_elapsed_times(self):
+        plt.figure(figsize=(10, 6))
+        plt.bar(range(len(self.elapsed_times)), self.elapsed_times, color='blue')
+        plt.xlabel('Simulation Step')
+        plt.ylabel('Elapsed Time (seconds)')
+        plt.grid(axis='y')
+        plt.tight_layout()
+        plt.show()
+
+    def plot_ttc_over_time(self):
+        """
+        Plot the Time to Collision (TTC) over time.
+        """
+        plt.figure(figsize=(10, 6))
+        plt.plot(self.time_steps, self.ttc_history, 'g-', label='Minimum TTC')
+        plt.axhline(y=1, color='r', linestyle='--', label='TTC Threshold (1s)')
+        plt.axhline(y=2, color='orange', linestyle='--', label='TTC Threshold (2s)')
+        plt.xlabel('Time [s]')
+        plt.ylabel('TTC [s]')
+        plt.legend()
+        plt.grid(True)
+        plt.xlim(0, self.time_steps[-1])
+        plt.tight_layout()
+        plt.show()
+
+
 # Run the simulation
 num_followers = 10
+attack_id=[3,9]
 blockchain = Blockchain(num_followers)
 simulation = LeaderFollowerSimulation(num_followers, blockchain)
-simulation.run_simulation()
+simulation.run_simulation(attack_id)
 print(blockchain.nodes)
