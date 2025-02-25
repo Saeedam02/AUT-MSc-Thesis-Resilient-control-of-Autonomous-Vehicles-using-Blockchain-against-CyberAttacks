@@ -7,13 +7,12 @@ This repository contains the code and documentation for the MSc project titled *
 ## Features
 - **Resilient Control Algorithms**: Adaptive control systems designed to maintain vehicle stability and performance under cyber-attack conditions.
 - **Blockchain Integration**: Using blockchain technology to secure communication and data integrity among vehicle sensors and control units.
-- **Cyber-Attack Mitigation**: Strategies and mechanisms to detect and counteract various types of cyber-attacks, such as jamming, spoofing, and denial-of-service attacks.
+- **Cyber-Attack Mitigation**: Strategies and mechanisms to detect and counteract various types of cyber-attacks, such as Sybil, spoofing,FDI and distributed denial-of-service attacks(DDoS).
 
 ## Project Structure
 - `src/`: Contains the source code for the control algorithms and blockchain integration.
 - `docs/`: Documentation and research papers related to the project.
 - `simulations/`: Simulation scripts and results demonstrating the effectiveness of the proposed solutions.
-- `tests/`: Unit tests and test cases for the algorithms and blockchain modules.
 
 ## Installation
 To get started with the project, clone the repository and install the necessary dependencies:
@@ -29,4 +28,4 @@ I welcome contributions from the community. If you have ideas for improvements o
 This project is licensed under the MIT License - see the LICENSE file for details.
 
 ## Contact
-For questions or further information, please contact Saeed Aghamohammadi at Saeed008190@gmail.com
+For questions or further information, please contact Saeed Aghamohammadi at Saeedaghamohammadi99@gmail.com
