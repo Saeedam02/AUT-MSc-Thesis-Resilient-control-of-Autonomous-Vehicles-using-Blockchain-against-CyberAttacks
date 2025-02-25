@@ -3,6 +3,17 @@ A project focused on implementing resilient control mechanisms for autonomous ve
 
 ## Overview
 This repository contains the code and documentation for the MSc project titled **"Resilient Control of Autonomous Vehicles under Cyber-Attacks against Sensors using Blockchain Technology"**. The project aims to develop and implement resilient control mechanisms for autonomous vehicles, leveraging blockchain technology to enhance security against various cyber-attacks on sensor systems.
+# Platooning Algorithm for Autonomous Vehicles
+
+## 1. Position Evolution of the Platoon
+The following figure illustrates the position evolution of a platoon of autonomous vehicles over time. The black dots represent follower vehicles, while the red dot indicates the leader. The vehicles move within lane boundaries (blue lines) and maintain a coordinated formation. Over time, the platoon moves forward while preserving a stable formation.
+
+![Platooning Position Evolution](images/Position.png)
+
+## 2. Velocity and Distance Regulation
+The velocity and inter-vehicle distance are key parameters in platoon stability. The top plot shows the velocity convergence of all vehicles in the platoon. Initially, vehicles exhibit fluctuations in speed as they adjust to maintain a safe distance from their leader. Over time, they stabilize at a uniform speed. The bottom plot represents the inter-vehicle distance. The blue curve shows the actual distance between vehicles, while the red dashed line represents the desired safe gap. The system ensures that the vehicles reach and maintain the optimal distance, preventing collisions while optimizing traffic flow.
+
+![Velocity and Distance Regulation](images/Velocity&distance.png)
 
 ## Features
 - **Resilient Control Algorithms**: Adaptive control systems designed to maintain vehicle stability and performance under cyber-attack conditions.
