@@ -9,6 +9,23 @@ This repository contains the code and documentation for the MSc project titled *
 - **Blockchain Integration**: Using blockchain technology to secure communication and data integrity among vehicle sensors and control units.
 - **Cyber-Attack Mitigation**: Strategies and mechanisms to detect and counteract various types of cyber-attacks, such as Sybil, spoofing,FDI and distributed denial-of-service attacks(DDoS).
 
+# Security Threats and Blockchain-based Mitigation
+
+## 1. False Data Injection (FDI) Attack
+FDI attacks involve an adversary injecting malicious data into the system to manipulate decision-making processes. The blockchain records transactions, applies the WMS algorithm for attack detection, and corrects the status of the attacked agent before creating a new block.
+
+![Image 1 Description](images/FDI.png)
+
+## 2. Spoofing Attack
+In a spoofing attack, a malicious agent impersonates a legitimate node by signing data with an invalid signature. Blockchain-based signature verification ensures that only transactions with valid signatures are recorded, preventing spoofing attacks.
+
+![Image 2 Description](images/Spoofing.png)
+
+## 3. Sybil Attack
+A Sybil attack occurs when an adversary creates multiple virtual agents to gain control over the network. The blockchain-based vehicle registration mechanism identifies invalid IDs and prevents malicious nodes from being registered.
+
+![Image 3 Description](images/Sybil.png)
+
 ## Project Structure
 - `src/`: Contains the source code for the control algorithms and blockchain integration.
 - `docs/`: Documentation and research papers related to the project.
